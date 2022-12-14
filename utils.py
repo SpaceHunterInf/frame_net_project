@@ -105,7 +105,7 @@ class sentence_eds():
         self.eds_lines = self.eds_text.split('\n ')
         for line_idx in range(len(self.eds_lines)):
             line = self.eds_lines[line_idx]
-            if line[:len(id)] == id:
+            if line.split(':')[0] == id and line != self.eds_lines[0]:
                 update_predicate = re.sub(self.predicate_reg, ':' + new_predicate + '<', line)
                 
                 edges_strings = []

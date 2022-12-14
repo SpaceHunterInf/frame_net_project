@@ -12,7 +12,7 @@ logging.basicConfig(filename='projection_log.txt',
                     filemode='a',
                     format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                     datefmt='%H:%M:%S',
-                    level=logging.WARNING)
+                    level=logging.CRITICAL)
 
 logging.info("Running Urban Planning")
 
@@ -129,8 +129,11 @@ def update_graph(sentence, eds:EDS, semlink:SemLinkAnnotation, remaining_verb_no
     #update edge roles
     target_dependencies = [x for x in semlink.dependencies if ';' in x.split('-')[-1]]
     arg_assosicated_strings = get_children_strings(sentence, eds, source_verb_node)
-
+    #print(arg_assosicated_strings)
     source_verb_edges_dict = deepcopy(source_verb_node.edges)
+
+    dependency_edit_distance_comparision_dict = {} 
+
     for dependency in target_dependencies:
         token_intervals = dependency.split('-')[0].replace(';','*').replace(',','*').split('*')
         concate_string = ""
@@ -143,25 +146,53 @@ def update_graph(sentence, eds:EDS, semlink:SemLinkAnnotation, remaining_verb_no
 
         target_child_node = None
 
-        max_len = 0
-        for key in arg_assosicated_strings:
-            if len(arg_assosicated_strings[key]) > max_len:
-                max_len = len(arg_assosicated_strings[key])
+        max_len = len(sentence)
+        # for key in arg_assosicated_strings:
+        #     if len(arg_assosicated_strings[key]) > max_len:
+        #         max_len = len(arg_assosicated_strings[key])
         
         for key in arg_assosicated_strings:
             arg_assosicated_strings[key] += '='*(max_len - len(arg_assosicated_strings[key]))
 
         edit_distances = sorted([(key, edit_distance(concate_string, arg_assosicated_strings[key])) for key in arg_assosicated_strings.keys()], key= lambda x : x[1])
-        try:
-            old_key = edit_distances[0][0]
+        dependency_edit_distance_comparision_dict[fn_role] = edit_distances
+    
+    #search for global minmum edit_distance between text and dependency of a given arg name
+    #print(dependency_edit_distance_comparision_dict)
+    for key in arg_assosicated_strings.keys():
+        if len(dependency_edit_distance_comparision_dict) == 0:
+            logging.warning('Semlink need an extra arg', source_verb_node, source_verb_node.edges, semlink.file_path)
+            break
+        minimum = 1000000
+        best_fit_dep = None
+        for dep in dependency_edit_distance_comparision_dict.keys():
+            all_edit = dependency_edit_distance_comparision_dict[dep]
+            for edit in all_edit:
+                if edit[0] == key:
+                    if edit[1] < minimum:
+                        minimum = edit[1]
+                        best_fit_dep = dep
+        if best_fit_dep == None:
+            logging.warning('Semlink need an extra arg', source_verb_node, source_verb_node.edges, semlink.file_path)
+        else:
+            dependency_edit_distance_comparision_dict.pop(best_fit_dep)
+            new_key = key + '-fn.' + best_fit_dep
+            source_verb_edges_dict[new_key] = source_verb_edges_dict.pop(key)
 
-            new_key = old_key + '-fn.' + fn_role
-            arg_assosicated_strings.pop(old_key)
-            source_verb_edges_dict[new_key] = source_verb_edges_dict.pop(old_key)
-            #print(new_key)
-        except:
-            #exit() annotation mismatch
-            logging.warning('annotation mismatch', edit_distances, source_verb_node, source_verb_node.edges, sentence, semlink.file_path)
+    if len(dependency_edit_distance_comparision_dict) > 0:
+        logging.warning('EDS need an extra arg', source_verb_node, source_verb_node.edges, semlink.file_path)
+        # try:
+        #     old_key = edit_distances[0][0]
+
+        #     new_key = old_key + '-fn.' + fn_role
+        #     arg_assosicated_strings.pop(old_key)
+        #     source_verb_edges_dict[new_key] = source_verb_edges_dict.pop(old_key)
+        #     if len(arg_assosicated_strings) == 0:
+        #         break
+        #     #print(new_key)
+        # except:
+        #     #exit() annotation mismatch
+        #     logging.warning('annotation mismatch', edit_distances, source_verb_node, source_verb_node.edges, sentence, semlink.file_path)
 
         
     
@@ -223,7 +254,7 @@ if __name__ == "__main__":
         joblib.dump(output_dict, f)
 
     with open(os.path.join('deepbank_projected', 'projected.json'), 'w') as f:
-        f.write(json.dumps(output_dict))
+        f.write(json.dumps(output_dict, indent=2))
         f.close()
         
     
