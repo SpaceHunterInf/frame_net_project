@@ -130,13 +130,13 @@ class NodeLevelGNN(pl.LightningModule):
         return optimizer
 
     def training_step(self, batch, batch_idx):
-        loss, acc, _= self.forward(batch, mode="train")
+        loss, acc, _= self.forward(batch)
         self.log('train_loss', loss)
         self.log('train_acc', acc)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        _, acc, _ = self.forward(batch, mode="val")
+        _, acc, _ = self.forward(batch)
         self.log('val_acc', acc)
 
 
@@ -174,17 +174,17 @@ class EdgeLevelMLP(pl.LightningModule):
         return optimizer
 
     def training_step(self, batch, batch_idx):
-        loss, acc = self.forward(batch, mode="train")
+        loss, acc = self.forward(batch)
         self.log('train_loss', loss)
         self.log('train_acc', acc)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        _, acc = self.forward(batch, mode="val")
+        _, acc = self.forward(batch)
         self.log('val_acc', acc)
 
     def test_step(self, batch, batch_idx):
-        _, acc = self.forward(batch, mode="test")
+        _, acc = self.forward(batch)
         self.log('test_acc', acc)
 
 
