@@ -110,7 +110,6 @@ class NodeLevelGNN(pl.LightningModule):
         self.loss_module = nn.CrossEntropyLoss()
 
     def forward(self, data):
-        
         #Data(edge_index=[2, 10556], test_mask=[2708], train_mask=[2708], val_mask=[2708], x=[2708, 1433], y=[2708])
         
         x, edge_index = data.x, data.edge_index
@@ -191,7 +190,7 @@ class EdgeLevelMLP(pl.LightningModule):
 
 def train_node_classifier(model_name, dataset, num_labels, **model_kwargs):
     pl.seed_everything(42)
-    node_data_loader = DataLoader(dataset, batch_size=32)
+    node_data_loader = geom_data.DataLoader(dataset, batch_size=32)
 
     # Create a PyTorch Lightning trainer with the generation callback
     root_dir = os.path.join('node_level', "NodeLevel" + model_name)
@@ -242,7 +241,7 @@ if __name__ == '__main__':
         roles2id = json.load(f)
     num_role_label = len(roles2id.keys())
 
-    with open('verb_data.pkl','rb') as f:
+    with open('verb_transformed.pkl','rb') as f:
         verb_data = joblib.load(f)
 
     train_dataset = edsDataset(verb_data[:100])
