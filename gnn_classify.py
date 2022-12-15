@@ -1,4 +1,5 @@
 import torch_geometric
+from torch_geometric.data import Data
 import torch_geometric.nn as geom_nn
 import torch_geometric.data as geom_data
 import torch
@@ -11,7 +12,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from prepare_data import *
 
-from sklearn import 
+from sklearn.model_selection import train_test_split
 
 gnn_layer_by_name = {
     "GCN": geom_nn.GCNConv,
@@ -101,46 +102,75 @@ class Edge_MLP(nn.Module):
 
 class NodeLevelGNN(pl.LightningModule):
 
-    def __init__(self, model_name, feature_config, **model_kwargs):
+    def __init__(self, feature_config, **model_kwargs):
         super().__init__()
         # Saving hyperparameters
         self.save_hyperparameters()
         self.feature_config = feature_config
 
-        if model_name == "EDGE":
-            self.model = Edge_MLP(**model_kwargs)
-        else:
-            self.model = GNNModel(**model_kwargs)
+        self.model = GNNModel(**model_kwargs)
         self.loss_module = nn.CrossEntropyLoss()
 
-    def forward(self, input, mode="train_node"):
+    def forward(self, input):
         node_features, edge_index, node2id = eds_encode(input['sentence'])
-        if mode == 'train_node':
-            mask = [False for node in input['eds'].nodes]
-            mask[node2id[input['verb_id']]] = True
-            y = [-1 for node in input['eds'].nodes]
-            y[node2id[input['verb_id']]] = input['target_fn_frame_id']
-            data = Data(x = node_features, edge_index = edge_index.t().contigous(), mask=mask, y=y)
-            #Data(edge_index=[2, 10556], test_mask=[2708], train_mask=[2708], val_mask=[2708], x=[2708, 1433], y=[2708])
-        else:
-            #TODO implement edge prediction
-            y = input[[target_fn_role_id]]
-            data = Data(x = node_features, edge_index = edge_index.t().contigous(), mask=mask, y=y)
+        mask = [False for node in input['eds'].nodes]
+        mask[node2id[input['verb_id']]] = True
+        y = torch.nn.functional.one_hot(torch.tensor([input['target_fn_frame_id']]), num_classes=len(x)).to(torch.float)
+        data = Data(x = node_features, edge_index = edge_index.t().contigous(), mask=mask, y=y)
+        #Data(edge_index=[2, 10556], test_mask=[2708], train_mask=[2708], val_mask=[2708], x=[2708, 1433], y=[2708])
+
         x, edge_index = data.x, data.edge_index
-        x = self.model(x, edge_index)
+        x = self.model(x, edge_index)['after_classifier']
 
-        # Only calculate the loss on the nodes corresponding to the mask
-        if mode == "train":
-            mask = data.train_mask
-        elif mode == "val":
-            mask = data.val_mask
-        elif mode == "test":
-            mask = data.test_mask
+        loss = self.loss_module(x[mask], y)
+        if x[mask].argmax(dim = -1) == y.argmax(dim = -1):
+            acc = 1
         else:
-            assert False, f"Unknown forward mode: {mode}"
+            acc = 0
+        return loss, acc, x[mask].argmax(dim = -1)
 
-        loss = self.loss_module(x[mask], data.y[mask])
-        acc = (x[mask].argmax(dim=-1) == data.y[mask]).sum().float() / mask.sum()
+    def configure_optimizers(self):
+        # We use SGD here, but Adam works as well
+        optimizer = optim.SGD(self.parameters(), lr=0.1, momentum=0.9, weight_decay=2e-3)
+        return optimizer
+
+    def training_step(self, batch, batch_idx):
+        loss, acc, _= self.forward(batch, mode="train")
+        self.log('train_loss', loss)
+        self.log('train_acc', acc)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        _, acc, _ = self.forward(batch, mode="val")
+        self.log('val_acc', acc)
+
+
+class EdgeLevelMLP(pl.LightningModule):
+    def __init__(self, feature_config, GNN, **model_kwargs):
+        self.feature_config = feature_config
+        self.feature_config = feature_config
+
+        self.model = GNNModel(**model_kwargs)
+        self.loss_module = nn.CrossEntropyLoss()
+        self.gnn_model = GNN
+
+    def forward(self, x):
+        node_features, edge_index, node2id = eds_encode(input['sentence'])
+        edge_start_embedding = x[node2id[input['start']]]
+        edge_end_embedding = x[node2id[input['end']]]
+        edge_feature = torch.cat((edge_start_embedding, edge_end_embedding), 0)
+
+        with torch.no_grad():
+            x = self.gnn_model(node_features, edge_index.t().contigous)
+        x = self.model(edge_feature)
+        y = input[[target_fn_role_id]]
+        if int(x.argmax(dim=-1)) == y:
+            acc = 1
+        else:
+            acc = 0
+        y = torch.nn.functional.one_hot(torch.tensor([y]), num_classes=len(x)).to(torch.float)
+        
+        loss = self.loss_module(x, y)
         return loss, acc
 
     def configure_optimizers(self):
@@ -163,5 +193,55 @@ class NodeLevelGNN(pl.LightningModule):
         self.log('test_acc', acc)
 
 
-if __name__ == '__main__':
+def train_node_classifier(model_name, dataset, num_labels, check_point_path = "", **model_kwargs):
+    pl.seed_everything(42)
+    node_data_loader = DataLoader(dataset, batch_size=32)
+
+    # Create a PyTorch Lightning trainer with the generation callback
+    root_dir = os.path.join('node_level', "NodeLevel" + model_name)
+    os.makedirs(root_dir, exist_ok=True)
+
+    trainer = pl.Trainer(default_root_dir=root_dir,
+                         callbacks=[ModelCheckpoint(save_weights_only=True, mode="max", monitor="val_acc")],
+                         accelerator="gpu",
+                         devices=1,
+                         max_epochs=200,
+                         enable_progress_bar=False) # False because epoch size is 1
+    trainer.logger._default_hp_metric = None # Optional logging argument that we don't need
+
+    # Check whether pretrained model exists. If yes, load it and skip training
+
+    pl.seed_everything()
+    model = NodeLevelGNN(model_name=model_name, c_in=dataset.feature_length, c_out=num_labels, **model_kwargs)
+    trainer.fit(model, node_data_loader, node_data_loader)
     
+    model.save_pretrained(root_dir)
+    # Test best model on the test set
+    # test_result = trainer.test(model, node_data_loader, verbose=False)
+    # batch = next(iter(node_data_loader))
+    # batch = batch.to(model.device)
+    # _, train_acc = model.forward(batch, mode="train")
+    # _, val_acc = model.forward(batch, mode="val")
+    # result = {"train": train_acc,
+    #           "val": val_acc,
+    #           "test": test_result[0]['test_acc']}
+    return model
+
+def test_accuracy(model, data):
+    correct = 0
+    for x in data:
+        with torch.no_grad():
+            _,_,predict = model.forward(x)
+        if predict == x.y:
+            correct +=1
+    
+    return correct/len(data)
+
+
+if __name__ == '__main__':
+    with open('fn_frame2id.json','r') as f:
+        frame2id = json.load(f)
+    num_frame_label = len(frame2id.keys())
+    with open('fn_roles2id.json','r') as f:
+        roles2id = json.load(f)
+    num_role_label = len(roles2id.keys())

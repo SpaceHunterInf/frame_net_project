@@ -6,6 +6,7 @@ from tqdm import tqdm
 import torch
 from utils import *
 from sentence_transformers import SentenceTransformer
+from torch.utils.data import DataLoader, TensorDataset, Dataset
 sentence_encoder_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 def eds_encode(sentence, eds, feature_dict):
@@ -48,6 +49,18 @@ def node_feature_encode(sentence, eds_node, features):
     node_feature = torch.tensor(eds_predicate_feature + eds_type_feature + eds_properties_feature)
     #node_feature = torch.cat((torch.from_numpy(sentence_encoder_model.encode(text)), node_feature), 0)
     return node_feature
+
+class edsDataset():    
+    def __init__(self, data):          
+        self.data = data
+        self.feature_length = data[0].x.shape(1)
+        
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+    def __len__(self):
+        return len(self.data)
+
 
 if __name__ == '__main__':
     fn_frame2id = {}
