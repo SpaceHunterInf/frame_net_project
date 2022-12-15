@@ -48,7 +48,7 @@ def node_feature_encode(sentence, eds_node, features):
     # to handle unseen inputs
 
     node_feature = torch.tensor(eds_predicate_feature + eds_type_feature + eds_properties_feature)
-    node_feature = torch.cat((torch.from_numpy(sentence_encoder_model.encode(text)), node_feature), 0)
+    #node_feature = torch.cat((torch.from_numpy(sentence_encoder_model.encode(text)), node_feature), 0)
     return node_feature
 
 class edsDataset():    

@@ -101,25 +101,21 @@ class Edge_MLP(nn.Module):
 
 class NodeLevelGNN(pl.LightningModule):
 
-    def __init__(self, feature_config, **model_kwargs):
+    def __init__(self, **model_kwargs):
         super().__init__()
         # Saving hyperparameters
         self.save_hyperparameters()
-        self.feature_config = feature_config
 
         self.model = GNNModel(**model_kwargs)
         self.loss_module = nn.CrossEntropyLoss()
 
-    def forward(self, input):
-        with torch.no_grad():
-            node_features, edge_index, node2id = eds_encode(input['sentence'])
-        mask = [False for node in input['eds'].nodes]
-        mask[node2id[input['verb_id']]] = True
-        y = torch.nn.functional.one_hot(torch.tensor([input['target_fn_frame_id']]), num_classes=len(x)).to(torch.float)
-        data = Data(x = node_features, edge_index = edge_index.t().contigous(), mask=mask, y=y)
+    def forward(self, data):
+        
         #Data(edge_index=[2, 10556], test_mask=[2708], train_mask=[2708], val_mask=[2708], x=[2708, 1433], y=[2708])
-
+        
         x, edge_index = data.x, data.edge_index
+        mask = data.mask
+        y = data.y
         x = self.model(x, edge_index)['after_classifier']
 
         loss = self.loss_module(x[mask], y)
@@ -193,7 +189,7 @@ class EdgeLevelMLP(pl.LightningModule):
         self.log('test_acc', acc)
 
 
-def train_node_classifier(model_name, dataset, num_labels, feature_config, **model_kwargs):
+def train_node_classifier(model_name, dataset, num_labels, **model_kwargs):
     pl.seed_everything(42)
     node_data_loader = DataLoader(dataset, batch_size=32)
 
@@ -212,7 +208,7 @@ def train_node_classifier(model_name, dataset, num_labels, feature_config, **mod
     # Check whether pretrained model exists. If yes, load it and skip training
 
     pl.seed_everything()
-    model = NodeLevelGNN(model_name=model_name, c_in=835, c_hidden=400, c_out=num_labels, feature_config=feature_config, **model_kwargs)
+    model = NodeLevelGNN(model_name=model_name, c_in=835, c_hidden=400, c_out=num_labels, **model_kwargs)
     trainer.fit(model, node_data_loader, node_data_loader)
     
     model.save_pretrained(root_dir)
@@ -249,8 +245,10 @@ if __name__ == '__main__':
     with open('verb_data.pkl','rb') as f:
         verb_data = joblib.load(f)
 
-    with open('features_config.json','r') as f:
-        feature_config = json.load(f)
     train_dataset = edsDataset(verb_data[:100])
-    train_node_classifier('GNN', train_dataset, num_frame_label, feature_config)
+    train_node_classifier('GNN', train_dataset, num_frame_label)
     #835, 336
+
+
+    
+    
