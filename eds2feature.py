@@ -8,7 +8,7 @@ if __name__ == '__main__':
     with open('fn_frame2id.json','r') as f:
         fn_frame2id = json.load(f)
     verb_encoded_data = []
-    for input in inputs:
+    for input in tqdm(inputs, desc='encoding'):
         node_features, edge_index, node2id = eds_encode(input['sentence'])
         mask = [False for node in input['eds'].nodes]
         mask[node2id[input['verb_id']]] = True
