@@ -250,7 +250,7 @@ if __name__ == '__main__':
     with open('verb_data.pkl','rb') as f:
         verb_data = joblib.load(f)
 
-    with open('feature_config.json','r') as f:
+    with open('features_config.json','r') as f:
         feature_config = json.load(f)
     train_dataset = edsDataset(verb_data[:100])
     train_node_classifier('GNN', train_dataset, num_frame_label, feature_config)
