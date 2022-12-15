@@ -7,9 +7,11 @@ if __name__ == '__main__':
         inputs = joblib.load(f)
     with open('fn_frame2id.json','r') as f:
         fn_frame2id = json.load(f)
+    with open('features_config.json','r') as f:
+        feature_config = json.load(f)
     verb_encoded_data = []
     for input in tqdm(inputs, desc='encoding'):
-        node_features, edge_index, node2id = eds_encode(input['sentence'])
+        node_features, edge_index, node2id = eds_encode(input['sentence'], input['eds'], feature_config)
         mask = [False for node in input['eds'].nodes]
         mask[node2id[input['verb_id']]] = True
         y = torch.nn.functional.one_hot(torch.tensor([input['target_fn_frame_id']]), num_classes=len(fn_frame2id.keys())).to(torch.float)
