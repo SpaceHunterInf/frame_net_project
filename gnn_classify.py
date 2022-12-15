@@ -194,7 +194,7 @@ class EdgeLevelMLP(pl.LightningModule):
         self.log('test_acc', acc)
 
 
-def train_node_classifier(model_name, dataset, num_labels, **model_kwargs):
+def train_node_classifier(model_name, dataset, num_labels, feature_config, **model_kwargs):
     pl.seed_everything(42)
     node_data_loader = DataLoader(dataset, batch_size=32)
 
@@ -213,7 +213,7 @@ def train_node_classifier(model_name, dataset, num_labels, **model_kwargs):
     # Check whether pretrained model exists. If yes, load it and skip training
 
     pl.seed_everything()
-    model = NodeLevelGNN(model_name=model_name, c_in=835, c_mid=500, c_out=num_labels, **model_kwargs)
+    model = NodeLevelGNN(model_name=model_name, c_in=835, c_mid=500, c_out=num_labels, feature_config=feature_config, **model_kwargs)
     trainer.fit(model, node_data_loader, node_data_loader)
     
     model.save_pretrained(root_dir)
@@ -250,6 +250,8 @@ if __name__ == '__main__':
     with open('verb_data.pkl','rb') as f:
         verb_data = joblib.load(f)
 
+    with open('feature_config.json','r') as f:
+        feature_config = json.load(f)
     train_dataset = edsDataset(verb_data[:100])
-    train_node_classifier('GNN', train_dataset, num_frame_label)
+    train_node_classifier('GNN', train_dataset, num_frame_label, feature_config)
     #835, 336
