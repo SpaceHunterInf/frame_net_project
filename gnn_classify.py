@@ -112,7 +112,8 @@ class NodeLevelGNN(pl.LightningModule):
         self.loss_module = nn.CrossEntropyLoss()
 
     def forward(self, input):
-        node_features, edge_index, node2id = eds_encode(input['sentence'])
+        with torch.no_grad():
+            node_features, edge_index, node2id = eds_encode(input['sentence'])
         mask = [False for node in input['eds'].nodes]
         mask[node2id[input['verb_id']]] = True
         y = torch.nn.functional.one_hot(torch.tensor([input['target_fn_frame_id']]), num_classes=len(x)).to(torch.float)
@@ -212,7 +213,7 @@ def train_node_classifier(model_name, dataset, num_labels, **model_kwargs):
     # Check whether pretrained model exists. If yes, load it and skip training
 
     pl.seed_everything()
-    model = NodeLevelGNN(model_name=model_name, c_in=dataset.feature_length, c_out=num_labels, **model_kwargs)
+    model = NodeLevelGNN(model_name=model_name, c_in=835, c_mid=500, c_out=num_labels, **model_kwargs)
     trainer.fit(model, node_data_loader, node_data_loader)
     
     model.save_pretrained(root_dir)
@@ -251,3 +252,4 @@ if __name__ == '__main__':
 
     train_dataset = edsDataset(verb_data[:100])
     train_node_classifier('GNN', train_dataset, num_frame_label)
+    #835, 336
