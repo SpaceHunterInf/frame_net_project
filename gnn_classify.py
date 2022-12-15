@@ -112,9 +112,9 @@ class NodeLevelGNN(pl.LightningModule):
     def forward(self, data):
         #Data(edge_index=[2, 10556], test_mask=[2708], train_mask=[2708], val_mask=[2708], x=[2708, 1433], y=[2708])
         
-        x, edge_index = data.x, data.edge_index.to(torch.float32)
-        mask = data.mask
-        y = data.y
+        x, edge_index = data.x.to(torch.float32), data.edge_index.to(torch.int64)
+        mask = data.mask.to(torch.bool)
+        y = data.y.to(torch.float32)
         x = self.model(x, edge_index)['after_classifier']
 
         loss = self.loss_module(x[mask], y)
