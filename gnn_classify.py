@@ -193,7 +193,7 @@ class EdgeLevelMLP(pl.LightningModule):
         self.log('test_acc', acc)
 
 
-def train_node_classifier(model_name, dataset, num_labels, check_point_path = "", **model_kwargs):
+def train_node_classifier(model_name, dataset, num_labels, **model_kwargs):
     pl.seed_everything(42)
     node_data_loader = DataLoader(dataset, batch_size=32)
 
@@ -205,7 +205,7 @@ def train_node_classifier(model_name, dataset, num_labels, check_point_path = ""
                          callbacks=[ModelCheckpoint(save_weights_only=True, mode="max", monitor="val_acc")],
                          accelerator="gpu",
                          devices=1,
-                         max_epochs=200,
+                         max_epochs=5,
                          enable_progress_bar=False) # False because epoch size is 1
     trainer.logger._default_hp_metric = None # Optional logging argument that we don't need
 
@@ -245,3 +245,9 @@ if __name__ == '__main__':
     with open('fn_roles2id.json','r') as f:
         roles2id = json.load(f)
     num_role_label = len(roles2id.keys())
+
+    with open('verb_data.pkl','rb') as f:
+        verb_data = joblib.load(f)
+
+    train_dataset = edsDataset(verb_data[:100])
+    train_node_classifier('GNN', train_dataset, num_frame_label)
