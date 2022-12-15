@@ -22,7 +22,7 @@ gnn_layer_by_name = {
 
 class GNNModel(nn.Module):
 
-    def __init__(self, c_in, c_hidden, c_out, num_layers=2, layer_name="GCN", dp_rate=0.1, **kwargs,):
+    def __init__(self, c_in, c_out, c_hidden=500, num_layers=2, layer_name="GCN", dp_rate=0.1, **kwargs,):
         """
         Inputs:
             c_in - Dimension of input features
@@ -35,6 +35,7 @@ class GNNModel(nn.Module):
         """
         super().__init__()
         gnn_layer = gnn_layer_by_name[layer_name]
+
         layers = []
         in_channels, out_channels = c_in, c_hidden
         for l_idx in range(num_layers-1):
@@ -47,11 +48,11 @@ class GNNModel(nn.Module):
             ]
             in_channels = c_hidden
         layers += [gnn_layer(in_channels=in_channels,
-                             out_channels=in_channels,
+                             out_channels=c_hidden,
                              **kwargs)]
         self.layers = nn.ModuleList(layers)
         classification_out_channel = c_out
-        self.linear = torch.nn.Linear(in_channels, classification_out_channel)
+        self.linear = torch.nn.Linear(c_hidden, classification_out_channel)
 
     def forward(self, x, edge_index):
         """
@@ -189,7 +190,7 @@ class EdgeLevelMLP(pl.LightningModule):
         self.log('test_acc', acc)
 
 
-def train_node_classifier(model_name, dataset, num_labels, **model_kwargs):
+def train_node_classifier(model_name, dataset, num_labels, num_features, **model_kwargs):
     pl.seed_everything(42)
     node_data_loader = geom_data.DataLoader(dataset, batch_size=32)
 
@@ -208,7 +209,7 @@ def train_node_classifier(model_name, dataset, num_labels, **model_kwargs):
     # Check whether pretrained model exists. If yes, load it and skip training
 
     pl.seed_everything()
-    model = NodeLevelGNN(model_name=model_name, c_in=835, c_hidden=400, c_out=num_labels, **model_kwargs)
+    model = NodeLevelGNN(model_name=model_name, c_in=num_features, c_out=num_labels, **model_kwargs)
     trainer.fit(model, node_data_loader, node_data_loader)
     
     model.save_pretrained(root_dir)
@@ -244,9 +245,9 @@ if __name__ == '__main__':
 
     with open('verb_transformed.pkl','rb') as f:
         verb_data = joblib.load(f)
-
+    num_features = (verb_data[0].x.shape[1])
     train_dataset = edsDataset(verb_data[:100])
-    train_node_classifier('GNN', train_dataset, num_frame_label)
+    train_node_classifier('GNN',  train_dataset, num_frame_label, num_features)
     #835, 336
 
 
