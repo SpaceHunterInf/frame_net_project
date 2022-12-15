@@ -22,7 +22,7 @@ gnn_layer_by_name = {
 
 class GNNModel(nn.Module):
 
-    def __init__(self, c_in, c_hidden, c_mid , c_out, num_layers=2, layer_name="GCN", dp_rate=0.1, **kwargs,):
+    def __init__(self, c_in, c_hidden, c_out, num_layers=2, layer_name="GCN", dp_rate=0.1, **kwargs,):
         """
         Inputs:
             c_in - Dimension of input features
@@ -46,13 +46,12 @@ class GNNModel(nn.Module):
                 nn.Dropout(dp_rate)
             ]
             in_channels = c_hidden
-        mid_channels = c_mid
         layers += [gnn_layer(in_channels=in_channels,
-                             out_channels=mid_channels,
+                             out_channels=in_channels,
                              **kwargs)]
         self.layers = nn.ModuleList(layers)
         classification_out_channel = c_out
-        self.linear = torch.nn.Linear(mid_channels, classification_out_channel)
+        self.linear = torch.nn.Linear(in_channels, classification_out_channel)
 
     def forward(self, x, edge_index):
         """
@@ -213,7 +212,7 @@ def train_node_classifier(model_name, dataset, num_labels, feature_config, **mod
     # Check whether pretrained model exists. If yes, load it and skip training
 
     pl.seed_everything()
-    model = NodeLevelGNN(model_name=model_name, c_in=835, c_mid=500, c_out=num_labels, feature_config=feature_config, **model_kwargs)
+    model = NodeLevelGNN(model_name=model_name, c_in=835, c_hidden=400, c_out=num_labels, feature_config=feature_config, **model_kwargs)
     trainer.fit(model, node_data_loader, node_data_loader)
     
     model.save_pretrained(root_dir)
