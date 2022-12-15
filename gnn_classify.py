@@ -242,7 +242,7 @@ if __name__ == '__main__':
     with open('fn_frame2id.json','r') as f:
         frame2id = json.load(f)
     num_frame_label = len(frame2id.keys())
-    with open('fn_roles2id.json','r') as f:
+    with open('fn_role2id.json','r') as f:
         roles2id = json.load(f)
     num_role_label = len(roles2id.keys())
 
