@@ -119,6 +119,9 @@ class NodeLevelGNN(pl.LightningModule):
         y = data.y.to(torch.float32)
         x = self.model(x, edge_index)['after_classifier']
 
+        print(x[mask].shape)
+        print(y.shape)
+        print(len(mask))
         loss = self.loss_module(x[mask], y)
         if x[mask].argmax(dim = -1) == y.argmax(dim = -1):
             acc = 1
