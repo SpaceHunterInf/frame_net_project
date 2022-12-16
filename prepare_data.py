@@ -7,8 +7,8 @@ import torch
 from utils import *
 from sentence_transformers import SentenceTransformer
 from torch.utils.data import DataLoader, TensorDataset, Dataset
-sentence_encoder_model = SentenceTransformer('all-MiniLM-L6-v2')
-sentence_encoder_model.cuda(0)
+# sentence_encoder_model = SentenceTransformer('all-MiniLM-L6-v2')
+# sentence_encoder_model.cuda(0)
 
 def eds_encode(sentence, eds, feature_dict):
     nodes2idx = {}
@@ -86,7 +86,7 @@ if __name__ == '__main__':
         f.close()
 
     with open('fn_role2id.json','w') as f:
-        f.write(json.dumps(fn_frame2id, indent=2))
+        f.write(json.dumps(fn_role2id, indent=2))
         f.close()
 
     node_classification_data = []
@@ -109,10 +109,10 @@ if __name__ == '__main__':
                 node_classification_data.append(verb_data)
 
                 for key in node.edges:
-                    if not '-fn.' in key:
+                    if not '-FN.' in key:
                         target_fn_role = '****'
                     else:
-                        target_fn_role = key.split('-fn.')[-1].lower()
+                        target_fn_role = key.split('-FN.')[-1].lower()
                     target_fn_role_id = fn_role2id[target_fn_role]
                     edge_data = {'sentence':s, 'eds':current_eds, 'start':node.id, 'end':node.edges[key], 'target_fn_role_id':target_fn_role_id}
                     edge_classification_data.append(edge_data)
