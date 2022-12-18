@@ -10,22 +10,22 @@ from dgl.dataloading import GraphDataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import pytorch_lightning as pl
 from tqdm import tqdm
-import os, sys
+import os, sys, random
 class GCN(nn.Module):
-    def __init__(self, in_feats, h_feats, num_classes):
+    def __init__(self, in_feats, h_feats, num_classes, num_layers=10):
         super(GCN, self).__init__()
         self.conv1 = GraphConv(in_feats, h_feats)
-        self.conv2 = GraphConv(h_feats, h_feats)
-        self.conv3 = GraphConv(h_feats, h_feats)
+        self.hidden_layers = []
+        for i in range(num_layers):
+            self.hidden_layers.append(GraphConv(h_feats, h_feats))
         self.linear = torch.nn.Linear(h_feats, num_classes)
+        self.hidden_layers = nn.ModuleList(self.hidden_layers)
 
     def forward(self, g, in_feat):
         h = self.conv1(g, in_feat)
-        h = F.relu(h)
-        h = self.conv2(g, h)
-        h = F.relu(h)
-        h = self.conv3(g, h)
-        h = F.relu(h)
+        for l in self.hidden_layers:
+            h = F.relu(h)
+            h = l(g, h)
         y = self.linear(h)
         return h, y
 
@@ -70,7 +70,7 @@ class NodeGNN(pl.LightningModule):
 def trainGNN(train_dataloader, val_dataloader, in_feature_size, hidden_size, num_classes, epochs, batch_size):
     model = NodeGNN(in_feature_size, hidden_size, num_classes)
 
-    save_path = os.path.join('node_gnn_save_double', '_'.join([str(in_feature_size), str(hidden_size), str('epochs')]))
+    save_path = os.path.join('node_gnn_save_double_10', '_'.join([str(in_feature_size), str(hidden_size), str('epochs')]))
     trainer = pl.Trainer(limit_train_batches=batch_size, max_epochs=epochs, accelerator="cuda", callbacks=[pl.callbacks.EarlyStopping(monitor='val_loss',min_delta=0.00, patience=5,verbose=False, mode='min')])
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     
@@ -104,6 +104,16 @@ def evaluate_model(model, dataset):
             count += 1
     return count/len(dataset)
 
+def random_baseline(dataset, num_classes):
+    count = 0
+    for g, _ in tqdm(dataset, desc = 'testing'):
+        x = random.randint(0, num_classes)
+        mask = g.ndata['mask']
+        y = g.ndata['label'][mask]
+        y = y.argmax(dim=-1)
+        if 1 == y.item():
+            count += 1
+    return count/len(dataset)
 
 def train(g, model):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
@@ -159,15 +169,15 @@ if __name__ ==  '__main__':
     test_dataset = edsDataset(data)
     g,_ = train_dataset[0]
 
-    train_sampler = SubsetRandomSampler(torch.arange(len(train_dataset)))
-    train_dataloader = GraphDataLoader(train_dataset, sampler=train_sampler, batch_size=5, drop_last=False)
+    # train_sampler = SubsetRandomSampler(torch.arange(len(train_dataset)))
+    # train_dataloader = GraphDataLoader(train_dataset, sampler=train_sampler, batch_size=5, drop_last=False)
 
-    val_dataloader = GraphDataLoader(val_dataset, batch_size=5, drop_last=False)
+    # val_dataloader = GraphDataLoader(val_dataset, batch_size=5, drop_last=False)
 
-    model = trainGNN(train_dataloader, val_dataloader, train_dataset.num_features, 300, train_dataset.num_classes, 100, 32)
+    # model = trainGNN(train_dataloader, val_dataloader, train_dataset.num_features, 300, train_dataset.num_classes, 100, 32)
 
     print('test start')
-    acc = evaluate_model(model, test_dataset)
+    acc = random_baseline(test_dataset, test_dataset.num_classes)
     print(acc)
     # g = g.to('cuda')
     #model = GCN(g.ndata['feat'].shape[1], 300, dataset.num_classes).to('cuda')

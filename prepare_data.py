@@ -105,22 +105,23 @@ if __name__ == '__main__':
             if '-fn.' in node.predicate: 
                 target_fn_frame = node.predicate.split('-fn.')[-1].lower()
                 target_fn_frame_id = fn_frame2id[target_fn_frame]
-                verb_data = {'sentence':s, 'eds':current_eds, 'verb_id':node.id, 'target_fn_frame_id':target_fn_frame_id}
-                node_classification_data.append(verb_data)
+                if target_fn_frame != 'in' and target_fn_frame != 'nf':
+                    verb_data = {'sentence':s, 'eds':current_eds, 'verb_id':node.id, 'target_fn_frame_id':target_fn_frame_id}
+                    node_classification_data.append(verb_data)
 
-                for key in node.edges:
-                    if not '-FN.' in key:
-                        target_fn_role = '****'
-                    else:
-                        target_fn_role = key.split('-FN.')[-1].lower()
-                    target_fn_role_id = fn_role2id[target_fn_role]
-                    edge_data = {'sentence':s, 'eds':current_eds, 'start':node.id, 'end':node.edges[key], 'target_fn_role_id':target_fn_role_id}
-                    edge_classification_data.append(edge_data)
+                    for key in node.edges:
+                        if not '-FN.' in key:
+                            target_fn_role = '****'
+                        else:
+                            target_fn_role = key.split('-FN.')[-1].lower()
+                        target_fn_role_id = fn_role2id[target_fn_role]
+                        edge_data = {'sentence':s, 'eds':current_eds, 'start':node.id, 'end':node.edges[key], 'target_fn_role_id':target_fn_role_id}
+                        edge_classification_data.append(edge_data)
 
-    with open('verb_data.pkl','wb') as f:
+    with open('verb_data_balanced.pkl','wb') as f:
         joblib.dump(node_classification_data, f)
 
-    with open('edge_data.pkl','wb') as f:
+    with open('edge_data_balanced.pkl','wb') as f:
         joblib.dump(edge_classification_data, f)
 
     exit()
